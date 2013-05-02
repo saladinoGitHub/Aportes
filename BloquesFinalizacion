@@ -1,0 +1,104 @@
+//
+//  FirstViewController.m
+//  GitHubBrowser
+//
+//  Created by CursoIOS3 on 30/04/13.
+//  Copyright (c) 2013 BigNerdRanch. All rights reserved.
+//
+
+#import "FirstViewController.h"
+#import "GHEvent.h"
+#import "Celda.h"
+
+@interface FirstViewController ()
+@property (nonatomic, strong) NSArray *ghEvents;
+
+@end
+
+@implementation FirstViewController
+
+
+- (void)refreshEvents
+{
+    dispatch_queue_t background = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    
+    NSString *ghEventsAPIURL = @"https://api.github.com/events";
+    dispatch_async(background, ^{
+        NSURL *url = [[NSURL alloc] initWithString:ghEventsAPIURL];
+        NSMutableURLRequest *newReq = [[NSMutableURLRequest alloc] initWithURL:url];
+        [newReq setValue:@"NO-CACHE" forHTTPHeaderField:@"Cache-control"];
+
+        
+        NSHTTPURLResponse* urlResponse = nil;
+        NSError *error = [[NSError alloc] init];
+        NSData *responseData = [NSURLConnection sendSynchronousRequest:newReq returningResponse:&urlResponse error:&error];
+        NSString *result = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+       
+        [NSThread sleepForTimeInterval:1.5];
+        NSLog(@"%@",result);
+        self.ghEvents = [GHEvent eventsFromJSON:responseData];
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [_eventTable reloadData];
+            [_spinner stopAnimating];
+        });
+    });
+}
+
+
+- (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
+{
+    self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
+    if (self)
+    {
+        self.title = @"Events";
+        self.tabBarItem.image = [UIImage imageNamed:@"first"];
+        _spinner.center = CGPointMake(160, 240);
+
+        [self.view addSubview:_spinner];
+        [_spinner startAnimating];
+        [self refreshEvents];
+    }
+    return self;
+}
+  						
+- (void)viewDidLoad
+{
+    _spinner.hidesWhenStopped = YES;
+    [_eventTable setDelegate:self];
+    [_eventTable setDataSource:self];
+    [super viewDidLoad];
+	
+    // Registrar la celda personalizada con la tabla
+    UINib *nib = [UINib nibWithNibName:@"celda" bundle:nil];
+    [self.eventTable registerNib:nib forCellReuseIdentifier:@"celda"];
+    
+  }
+
+- (void)didReceiveMemoryWarning
+{
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+#pragma mark - Table View
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return [self.ghEvents count];
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    // 
+    static NSString *CellIdentifier = @"celda";
+    Celda *cell = [tableView dequeueReusableCellWithIdentifier:CellIdentifier];
+    
+    cell.lblDesc.text = [[self.ghEvents objectAtIndex:[indexPath row]] description];
+
+    cell.lblNum.text = [NSString stringWithFormat:@"%d", indexPath.row];
+    return cell;
+
+}
+
+@end
